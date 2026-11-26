@@ -44,12 +44,12 @@ GremlinMob2 是面向 Mega Crit 的[《杀戮尖塔 2》（Slay the Spire 2）](
 
 角色和卡池入口在 `Character/`，卡牌按基础、攻击、技能、能力、衍生和先古分布在 `Cards/`，每张牌的数值和结算在同一个文件中。队伍存档与换位、战斗被动、生命变化在 `Roster/`。原生接口补丁、显示资源及一代文案转换分别在 `Patches/`、`Presentation/` 和 `Localization/`。模型类名参与生成存档 ID，归档文案和资源索引也使用这些类名。
 
-需要 .NET 9、Godot 4.5.1 和本机《杀戮尖塔 2》。重新导入素材需要 Python 和 Pillow。用 `GameDir` 指定二代安装目录，`GodotExe` 指定 Godot 命令行程序，`CatfallJar` 指定一代 Downfall JAR。用 `Sts1AssetsDir` 指定含 `powers/powers.atlas`、`powers/powers.png` 和 `images/potion` 的一代资源目录。若本机有经转换的对应 Spine 数据，可用 `NativeRigsDir` 指定六个原角色名子目录的上级目录，每个子目录应有对应的 PNG 和 `.spskel`。省略时使用构建脚本转换的 JSON。
+需要 .NET 9、Godot 4.5.1 和本机《杀戮尖塔 2》。重新导入素材需要 Python 和 Pillow。用 `GameDir` 指定二代安装目录，`GodotExe` 指定 Godot 命令行程序，`DownfallJar` 指定一代 Downfall JAR。用 `Sts1AssetsDir` 指定含 `powers/powers.atlas`、`powers/powers.png` 和 `images/potion` 的一代资源目录。若本机有经转换的对应 Spine 数据，可用 `NativeRigsDir` 指定六个原角色名子目录的上级目录，每个子目录应有对应的 PNG 和 `.spskel`。省略时使用构建脚本转换的 JSON。
 
 ```powershell
 dotnet build .\GremlinMob2.csproj -c Release `
   "-p:GameDir=<杀戮尖塔2安装目录>" "-p:GodotExe=<Godot命令行程序>" `
-  "-p:CatfallJar=<一代Downfall.jar>" "-p:Sts1AssetsDir=<一代游戏素材目录>" `
+  "-p:DownfallJar=<一代Downfall.jar>" "-p:Sts1AssetsDir=<一代游戏素材目录>" `
   "-p:DownfallGremlinsDir=<二代Downfall的Gremlins素材目录>"
 ```
 

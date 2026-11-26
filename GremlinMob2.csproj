@@ -23,8 +23,8 @@
   <ItemGroup><Sts1AssetsInput Include="$(Sts1AssetsDir)\powers\powers.*;$(Sts1AssetsDir)\images\potion\**\*.png;$(Sts1AssetsDir)\localization\**\keywords.json;$(Sts1AssetsDir)\images\ui\charSelect\tiny*Arrow.png" /></ItemGroup>
   <ItemGroup><DownfallCharacterInput Include="$(DownfallGremlinsDir)\images\character\*.png;$(DownfallGremlinsDir)\material\character\transition_mat.tres;$(DownfallGremlinsDir)\scenes\character\card_trail.tscn" /></ItemGroup>
   <ItemGroup><FeminizationCardArt Include="$(ProjectDir)assets\feminization_card_art\*.png" /></ItemGroup>
-  <Target Name="ImportLegacy" Condition="'$(CatfallJar)' != ''" Inputs="$(CatfallJar);$(FeminizationArchive);$(ProjectDir)tools\import_catfall.py;$(ProjectDir)tools\catalog.ini;$(ProjectDir)assets\ancient_placeholder.png;@(NativeRig);@(Sts1AssetsInput)" Outputs="$(ProjectDir)build\legacy\manifest.txt">
-    <Exec Command="python &quot;$(ProjectDir)tools\import_catfall.py&quot; &quot;$(CatfallJar)&quot; &quot;$(ProjectDir)build\legacy&quot; --base-sts1 &quot;$(Sts1AssetsDir)&quot; $(NativeRigsArg) $(FeminizationArg)" />
+  <Target Name="ImportLegacy" Condition="'$(DownfallJar)' != ''" Inputs="$(DownfallJar);$(FeminizationArchive);$(ProjectDir)tools\import_downfall.py;$(ProjectDir)tools\catalog.ini;$(ProjectDir)assets\ancient_placeholder.png;@(NativeRig);@(Sts1AssetsInput)" Outputs="$(ProjectDir)build\legacy\manifest.txt">
+    <Exec Command="python &quot;$(ProjectDir)tools\import_downfall.py&quot; &quot;$(DownfallJar)&quot; &quot;$(ProjectDir)build\legacy&quot; --base-sts1 &quot;$(Sts1AssetsDir)&quot; $(NativeRigsArg) $(FeminizationArg)" />
   </Target>
   <Target Name="PackAssets" DependsOnTargets="ImportLegacy" Inputs="$(ProjectDir)tools\pack.gd;$(MSBuildProjectFullPath);$(ProjectDir)assets\selection_original.tscn;$(ProjectDir)assets\character_icon.tscn;$(ProjectDir)build\legacy\manifest.txt;@(DownfallCharacterInput);@(FeminizationCardArt)" Outputs="$(ProjectDir)build\GremlinMob2\GremlinMob2.pck">
     <MakeDir Directories="$(ProjectDir)build\GremlinMob2" />

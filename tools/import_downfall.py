@@ -1,4 +1,4 @@
-"""Build a local asset input from the supplied Catfall jar. The jar is read as data."""
+"""Import local assets from a first-generation Downfall JAR."""
 import argparse
 import configparser
 import io
