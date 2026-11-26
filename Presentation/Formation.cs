@@ -13,11 +13,12 @@ namespace GremlinMob2;
 
 internal sealed class MobFormation
 {
-    private sealed class Figure(Node2D root, Node2D art, Node2D spine, Label hp, Control hover)
+    private sealed class Figure(Node2D root, Node2D art, Node2D spine, float? skinHoverHalfWidth, Label hp, Control hover)
     {
         internal Node2D Root { get; } = root;
         internal Node2D Art { get; } = art;
         internal Node2D Spine { get; } = spine;
+        internal float? SkinHoverHalfWidth { get; } = skinHoverHalfWidth;
         internal Label Hp { get; } = hp;
         internal Control Hover { get; } = hover;
         internal Vector2 Target { get; set; }
@@ -26,6 +27,7 @@ internal sealed class MobFormation
         internal bool HasHoverBounds { get; set; }
     }
 
+    private const float ReserveSpacing = 90;
     private static readonly ConditionalWeakTable<NCreature, MobFormation> Formations = new();
     private static readonly string[] SpineNames = ["angry", "fat", "shield", "sneak", "wizard"];
     private static readonly Action<NCreature, Node> UpdateBounds =
@@ -77,9 +79,19 @@ internal sealed class MobFormation
         var art = new Node2D();
         root.AddChild(art);
         var name = SpineNames[(int)fighter];
-        var spine = OriginalAssets.Spine(name, _alternate) ?? OriginalAssets.Spine(name) ??
+        var alternateSpine = _alternate ? OriginalAssets.Spine(name, alternate: true) : null;
+        var spine = alternateSpine ?? OriginalAssets.Spine(name) ??
             throw new InvalidOperationException($"Missing original Spine for {name}");
         art.AddChild(spine);
+        // Use the bodies for horizontal targeting. The alternate rigs include wide weapons and ribbons.
+        float? skinHoverHalfWidth = alternateSpine == null ? null : fighter switch
+        {
+            Fighter.Scout => 29,
+            Fighter.Guard => 34,
+            Fighter.Brute => 38,
+            Fighter.Mage => 39,
+            _ => ReserveSpacing / 2 - 2
+        };
 
         var hp = new Label
         {
@@ -94,9 +106,10 @@ internal sealed class MobFormation
             ?.GetNodeOrNull<NHealthBar>("%HealthBar")?.GetNodeOrNull<Label>("%HpLabel");
         hp.AddThemeConstantOverride("outline_size", nativeHp?.GetThemeConstant("outline_size") ?? 16);
         root.AddChild(hp);
+        float hoverHalfWidth = skinHoverHalfWidth ?? 42;
         var hover = new Control
         {
-            Name = "ReserveHover", Position = new(-42, -110), Size = new(84, 144),
+            Name = "ReserveHover", Position = new(-hoverHalfWidth, -110), Size = new(hoverHalfWidth * 2, 144),
             MouseFilter = Control.MouseFilterEnum.Pass
         };
         hover.MouseEntered += () =>
@@ -113,7 +126,7 @@ internal sealed class MobFormation
         };
         hover.MouseExited += () => NHoverTipSet.Remove(hover);
         root.AddChild(hover);
-        return _figures[fighter] = new(root, art, spine, hp, hover);
+        return _figures[fighter] = new(root, art, spine, skinHoverHalfWidth, hp, hover);
     }
 
     private void Arrange(MobRosterRelic roster)
@@ -169,7 +182,7 @@ internal sealed class MobFormation
             }
             else
             {
-                figure.Target = _origin + new Vector2(-90 * i, -30);
+                figure.Target = _origin + new Vector2(-ReserveSpacing * i, -30);
                 figure.Art.Position = new Vector2(0, 25);
                 figure.Hp.Text = member.Hp.ToString();
                 if (previousSlot < 0)
@@ -201,17 +214,7 @@ internal sealed class MobFormation
                 if (Mathf.Abs(position.X - figure.Target.X) < 1) position.X = figure.Target.X;
                 if (Mathf.Abs(position.Y - figure.Target.Y) < 1) position.Y = figure.Target.Y;
                 figure.Root.Position = position;
-                if (!figure.HasHoverBounds)
-                {
-                    using var skeleton = new MegaSprite(figure.Spine).GetSkeleton();
-                    if (skeleton is not null && skeleton.GetBounds() is { Size.Y: > 1 } bounds)
-                    {
-                        float top = Mathf.Min(-48, figure.Art.Position.Y + bounds.Position.Y);
-                        figure.Hover.Position = new Vector2(-42, top);
-                        figure.Hover.Size = new Vector2(84, Mathf.Max(34, figure.Art.Position.Y + bounds.End.Y) - top);
-                        figure.HasHoverBounds = true;
-                    }
-                }
+                if (!figure.HasHoverBounds) UpdateHoverBounds(figure);
                 figure.ChannelTime = Mathf.Max(0, figure.ChannelTime - delta);
                 float ratio = figure.ChannelTime / .5f;
                 figure.Hp.Modulate = new Color(1, 1, 1, 1 - .99f * ratio * ratio);
@@ -223,6 +226,26 @@ internal sealed class MobFormation
             if (!_attack && t > .5f) x = -20 * (1 - 2 * (1 - t) * (1 - t));
             _front.Art.Position = new Vector2(x, 0);
         }
+    }
+
+    private static void UpdateHoverBounds(Figure figure)
+    {
+        using var skeleton = new MegaSprite(figure.Spine).GetSkeleton();
+        if (skeleton?.GetBounds() is not { Size.X: > 1, Size.Y: > 1 } bounds) return;
+        bounds = (figure.Art.Transform * figure.Spine.Transform) * bounds;
+
+        float left = -42, right = 42;
+        float padding = figure.SkinHoverHalfWidth.HasValue ? 6 : 0;
+        if (figure.SkinHoverHalfWidth is { } edge)
+        {
+            left = Mathf.Clamp(bounds.Position.X - padding, -edge, -18);
+            right = Mathf.Clamp(bounds.End.X + padding, 18, edge);
+        }
+        float top = Mathf.Min(-48, bounds.Position.Y - padding);
+        float bottom = Mathf.Max(34, bounds.End.Y + padding);
+        figure.Hover.Position = new Vector2(left, top);
+        figure.Hover.Size = new Vector2(right - left, bottom - top);
+        figure.HasHoverBounds = true;
     }
 
     [HarmonyPatch(typeof(NCreature), nameof(NCreature.StartDeathAnim))]

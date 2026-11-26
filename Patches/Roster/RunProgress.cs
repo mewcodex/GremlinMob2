@@ -45,6 +45,14 @@ internal static class RemoveRetiredSharedContent
             crown.Props ??= new SavedProperties();
             (crown.Props.strings ??= []).Add(savedRoster);
         }
+        const string modeKey = nameof(MobRosterRelic.OverpoweredMode);
+        var mode = starter.Props?.bools?.FirstOrDefault(property => property.name == modeKey);
+        if (mode is { name: modeKey } savedMode &&
+            crown.Props?.bools?.Any(property => property.name == modeKey) != true)
+        {
+            crown.Props ??= new SavedProperties();
+            (crown.Props.bools ??= []).Add(savedMode);
+        }
         save.Relics.Remove(starter);
     }
 

@@ -11,7 +11,6 @@ public sealed class MobDisarmTheft() : DescribedMobCard(
     {
         if (play.Target is not { } target) return;
         await Apply<WeakPower>(ctx, EffectAmount, target);
-        await Apply<StrengthPower>(ctx, -EffectAmount, target);
-        await Apply<StrengthPower>(ctx, EffectAmount);
+        await StealStrength(ctx, target, EffectAmount);
     }
 }

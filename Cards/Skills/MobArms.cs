@@ -9,7 +9,9 @@ public sealed class MobArms() : DescribedMobCard(
     protected override async Task OnPlay(PlayerChoiceContext ctx, CardPlay play)
     {
         if (Crew is not { } crew) return;
-        for (int i = 0; i < EffectAmount; i++) await crew.TriggerBonus(ctx, crew.Front, play);
+        if (!Body.HasPower<MobRampageForm>())
+            for (int i = 0; i < EffectAmount; i++)
+                await crew.TriggerBonus(ctx, crew.Front, play);
         await ChooseFighter(ctx);
     }
 }

@@ -45,8 +45,18 @@ public abstract partial class MobRosterRelic
 
     internal async Task SpendCharge(PlayerChoiceContext context, int amount)
     {
-        if (Body.GetPowerAmount<MobChargePower>() > amount) await Charge(context, -amount);
-        else await PowerCmd.Remove<MobChargePower>(Body);
+        if (Body.GetPowerAmount<MobChargePower>() <= amount)
+        {
+            await ClearCharge();
+            return;
+        }
+        await Charge(context, -amount);
+        await MobSpellHat.RemoveDebuff(Owner);
+    }
+
+    internal async Task ClearCharge()
+    {
+        await PowerCmd.Remove<MobChargePower>(Body);
         await MobSpellHat.RemoveDebuff(Owner);
     }
 

@@ -37,7 +37,7 @@ public abstract class MobCard(int cost, CardType type, CardRarity rarity, Target
         }
         int amount = this switch
         {
-            MobDance or MobWizardSchool or MobPocketLift => 2,
+            MobDance or MobWizardSchool => 2,
             MobOpenTheWound => 3,
             MobPatchworkArmor => IsUpgraded ? 1 : 0,
             _ => 0
@@ -79,6 +79,15 @@ public abstract class MobCard(int cost, CardType type, CardRarity rarity, Target
 
     protected Task Apply<TPower>(PlayerChoiceContext context, decimal amount, Creature? target = null) where TPower : PowerModel =>
         PowerCmd.Apply<TPower>(context, target ?? Body, amount, Body, this);
+
+    protected async Task StealStrength(PlayerChoiceContext context, Creature target, int amount)
+    {
+        int strengthBefore = target.GetPowerAmount<StrengthPower>();
+        await Apply<StrengthPower>(context, -amount, target);
+        int stolen = strengthBefore - target.GetPowerAmount<StrengthPower>();
+        if (stolen > 0) await Apply<StrengthPower>(context, stolen);
+    }
+
     protected Task Charge(PlayerChoiceContext context, int amount) => Apply<MobChargePower>(context, amount);
     protected Task Draw(PlayerChoiceContext context, int amount) => CardPileCmd.Draw(context, amount, Owner);
     protected Task Energy(int amount) => PlayerCmd.GainEnergy(amount, Owner);

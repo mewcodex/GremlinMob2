@@ -2,11 +2,14 @@ extends SceneTree
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
-	if args.size() != 2:
+	if args.size() != 3:
 		quit(1)
 		return
 	var root := args[0].simplify_path()
 	var output := args[1].simplify_path()
+	var base_sts1 := args[2].simplify_path()
+	if not base_sts1.is_absolute_path():
+		base_sts1 = root.path_join(base_sts1).simplify_path()
 	var staging := root.path_join("build/resources")
 	DirAccess.make_dir_recursive_absolute(staging)
 	var packer := PCKPacker.new()
@@ -42,6 +45,23 @@ func _initialize() -> void:
 				quit(1)
 				return
 		picture_count += 1
+	var temp_hp_assets := {
+		"shield": root.path_join("assets/stslib/tempHP.png"),
+		"blockLeft3": base_sts1.path_join("images/ui/combat/blockLeft3.png"),
+		"blockBody3": base_sts1.path_join("images/ui/combat/blockBody3.png"),
+		"blockRight3": base_sts1.path_join("images/ui/combat/blockRight3.png")
+	}
+	for name: String in temp_hp_assets:
+		var image := Image.load_from_file(temp_hp_assets[name])
+		var filename := "temporary_hp_" + name + ".res"
+		var stage_path := staging.path_join(filename)
+		if image == null or image.is_empty() or ResourceSaver.save(ImageTexture.create_from_image(image), stage_path, ResourceSaver.FLAG_COMPRESS) != OK or packer.add_file("res://gremlin_mob_2/temporary_hp/" + name + ".res", stage_path) != OK:
+			push_error("Could not pack temporary HP texture " + name)
+			quit(1)
+			return
+	if packer.add_file("res://gremlin_mob_2/temporary_hp/StSLib-LICENSE.txt", root.path_join("assets/stslib/LICENSE.txt")) != OK:
+		quit(1)
+		return
 	for orb in [
 		["cost", "1024", "res://images/atlases/ui_atlas.sprites/card/energy_gremlin_mob_2.tres"],
 		["inline", "512", "res://images/packed/sprite_fonts/gremlin_mob_2_energy_icon.png"]

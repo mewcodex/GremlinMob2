@@ -1,4 +1,5 @@
 using HarmonyLib;
+using MegaCrit.Sts2.Core.CardSelection;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -8,6 +9,7 @@ using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Entities.RestSite;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.CardPools;
 using MegaCrit.Sts2.Core.Models.Powers;
@@ -50,9 +52,20 @@ internal sealed class FreeRevivalOption(Player player) : RestSiteOption(player)
     private string Image => OriginalAssets.Picture(IsEnabled ? "ui/campfire/resurrect" : "ui/campfire/resurrect_unusable")!;
     public override string OptionId => "MOB_REVIVE";
     public override IEnumerable<string> AssetPaths => [Image];
-    public override bool IsEnabled => MobRosterRelic.For(Owner)?.HasFallen == true;
-    public override Task<bool> OnSelect() =>
-        Task.FromResult(MobRosterRelic.For(Owner)?.ReviveRandom(Owner.Creature.MaxHp) == true);
+    public override bool IsEnabled => MobRosterRelic.For(Owner) is { } crew && (crew.OverpoweredMode || crew.HasFallen);
+    public override LocString Description => MobRosterRelic.For(Owner)?.OverpoweredMode == true ? Title : base.Description;
+
+    public override async Task<bool> OnSelect()
+    {
+        if (MobRosterRelic.For(Owner) is not { } crew) return false;
+        if (!crew.OverpoweredMode) return crew.ReviveRandom(Owner.Creature.MaxHp);
+
+        CardModel[] options = crew.HealthByMember().Where(member => member.Hp >= 0)
+            .Select(member => FighterOption.ForRestSite(Owner, member.Fighter, member.Hp)).ToArray();
+        var prefs = new CardSelectorPrefs(Title, 0, 1);
+        var choices = await CardSelectCmd.FromSimpleGrid(new BlockingPlayerChoiceContext(), options, Owner, prefs);
+        return choices.FirstOrDefault() is FighterOption selected && await crew.RestoreFromGravestone(selected.Fighter);
+    }
 
     [HarmonyPatch(typeof(RestSiteOption), "IconPath", MethodType.Getter)]
     private static class RevivalIcon

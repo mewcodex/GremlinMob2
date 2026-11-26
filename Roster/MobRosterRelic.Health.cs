@@ -1,3 +1,4 @@
+using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.RestSite;
@@ -7,6 +8,17 @@ namespace GremlinMob2;
 
 public abstract partial class MobRosterRelic
 {
+    public override Task AfterCombatVictory(CombatRoom room)
+    {
+        if (!OverpoweredMode || !HasFallen) return Task.CompletedTask;
+
+        for (int i = 1; i < Line.Count; i++)
+            if (Line[i].Hp == 0)
+                Line[i] = Line[i] with { Hp = 1 };
+        MobFormation.Update(Body, this);
+        return Task.CompletedTask;
+    }
+
     public override Task AfterActEntered()
     {
         if (_line == null)
@@ -116,6 +128,23 @@ public abstract partial class MobRosterRelic
             Line[fallen[0]] = revived;
         }
         MobFormation.Update(Body, this);
+        return true;
+    }
+
+    internal async Task<bool> RestoreFromGravestone(Fighter fighter)
+    {
+        int index = Line.FindIndex(member => member.Fighter == fighter && member.Hp >= 0);
+        if (index < 0) return false;
+        if (index == 0)
+        {
+            int missing = Body.MaxHp - Body.CurrentHp;
+            if (missing > 0) await CreatureCmd.Heal(Body, missing);
+        }
+        else
+        {
+            Line[index] = Line[index] with { Hp = Body.MaxHp };
+            MobFormation.Update(Body, this);
+        }
         return true;
     }
 }

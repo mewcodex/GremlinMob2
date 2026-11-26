@@ -23,15 +23,18 @@
   <ItemGroup><Sts1AssetsInput Include="$(Sts1AssetsDir)\powers\powers.*;$(Sts1AssetsDir)\images\potion\**\*.png;$(Sts1AssetsDir)\localization\**\keywords.json;$(Sts1AssetsDir)\images\ui\charSelect\tiny*Arrow.png" /></ItemGroup>
   <ItemGroup><DownfallCharacterInput Include="$(DownfallGremlinsDir)\images\character\*.png;$(DownfallGremlinsDir)\material\character\transition_mat.tres;$(DownfallGremlinsDir)\scenes\character\card_trail.tscn" /></ItemGroup>
   <ItemGroup><FeminizationCardArt Include="$(ProjectDir)assets\feminization_card_art\*.png" /></ItemGroup>
-  <Target Name="ImportLegacy" Condition="'$(DownfallJar)' != ''" Inputs="$(DownfallJar);$(FeminizationArchive);$(ProjectDir)tools\import_downfall.py;$(ProjectDir)tools\catalog.ini;$(ProjectDir)assets\ancient_placeholder.png;@(NativeRig);@(Sts1AssetsInput)" Outputs="$(ProjectDir)build\legacy\manifest.txt">
+  <ItemGroup>
+    <TemporaryHpAssets Include="$(ProjectDir)assets\stslib\*;$(Sts1AssetsDir)\images\ui\combat\blockLeft3.png;$(Sts1AssetsDir)\images\ui\combat\blockBody3.png;$(Sts1AssetsDir)\images\ui\combat\blockRight3.png" />
+  </ItemGroup>
+  <Target Name="ImportLegacy" Condition="'$(DownfallJar)' != ''" Inputs="$(DownfallJar);$(FeminizationArchive);$(ProjectDir)tools\import_downfall.py;$(ProjectDir)tools\catalog.ini;$(ProjectDir)tools\card_text_corrections.json;$(ProjectDir)assets\ancient_placeholder.png;@(NativeRig);@(Sts1AssetsInput)" Outputs="$(ProjectDir)build\legacy\manifest.txt">
     <Exec Command="python &quot;$(ProjectDir)tools\import_downfall.py&quot; &quot;$(DownfallJar)&quot; &quot;$(ProjectDir)build\legacy&quot; --base-sts1 &quot;$(Sts1AssetsDir)&quot; $(NativeRigsArg) $(FeminizationArg)" />
   </Target>
-  <Target Name="PackAssets" DependsOnTargets="ImportLegacy" Inputs="$(ProjectDir)tools\pack.gd;$(MSBuildProjectFullPath);$(ProjectDir)assets\selection_original.tscn;$(ProjectDir)assets\character_icon.tscn;$(ProjectDir)build\legacy\manifest.txt;@(DownfallCharacterInput);@(FeminizationCardArt)" Outputs="$(ProjectDir)build\GremlinMob2\GremlinMob2.pck">
+  <Target Name="PackAssets" DependsOnTargets="ImportLegacy" Inputs="$(ProjectDir)tools\pack.gd;$(MSBuildProjectFullPath);$(ProjectDir)assets\selection_original.tscn;$(ProjectDir)assets\character_icon.tscn;$(ProjectDir)build\legacy\manifest.txt;$(ProjectDir)build\legacy\data\text.json;@(DownfallCharacterInput);@(FeminizationCardArt);@(TemporaryHpAssets)" Outputs="$(ProjectDir)build\GremlinMob2\GremlinMob2.pck">
     <MakeDir Directories="$(ProjectDir)build\GremlinMob2" />
     <Copy SourceFiles="$(ProjectDir)tools\project.godot" DestinationFolder="$(ProjectDir)build\select" />
     <Copy SourceFiles="@(DownfallCharacterInput)" DestinationFolder="$(ProjectDir)build\select" />
     <Exec Command="&quot;$(GodotExe)&quot; --headless --path &quot;$(ProjectDir)build\select&quot; --editor --import" />
-    <Exec Command="&quot;$(GodotExe)&quot; --headless --path &quot;$(ProjectDir)tools&quot; --script res://pack.gd -- &quot;$(MSBuildProjectDirectory)&quot; &quot;$(MSBuildProjectDirectory)\build\GremlinMob2\GremlinMob2.pck&quot;" />
+    <Exec Command="&quot;$(GodotExe)&quot; --headless --path &quot;$(ProjectDir)tools&quot; --script res://pack.gd -- &quot;$(MSBuildProjectDirectory)&quot; &quot;$(MSBuildProjectDirectory)\build\GremlinMob2\GremlinMob2.pck&quot; &quot;$(Sts1AssetsDir)&quot;" />
   </Target>
   <Target Name="Package" AfterTargets="Build" DependsOnTargets="PackAssets">
     <Copy SourceFiles="$(TargetPath);$(ProjectDir)GremlinMob2.json" DestinationFolder="$(ProjectDir)build\GremlinMob2" />

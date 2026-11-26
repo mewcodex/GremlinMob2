@@ -276,7 +276,8 @@ def link_keywords(jar, base, lang, out):
 
 
 def localizations(jar, catalog, base):
-    """Keep source strings intact here. The game adapter handles display syntax."""
+    """Import source strings and apply the card descriptions synchronized to Simplified Chinese."""
+    corrections = json.loads((ROOT / "tools/card_text_corrections.json").read_text(encoding="utf-8"))
     files = {"cards": "CardStrings", "relics": "RelicStrings", "powers": "PowerStrings",
              "potions": "PotionStrings", "characters": "CharacterStrings", "ui": "UIStrings",
              "keywords": "KeywordStrings", "orbs": "OrbStrings"}
@@ -343,6 +344,15 @@ def localizations(jar, catalog, base):
                     out["powers"]["MobTemporaryGuard"] = {
                         "NAME": fields["PROPER_NAME"], "DESCRIPTIONS": [fields["DESCRIPTION"]]}
                     break
+        for model, description in corrections.get(lang, {}).items():
+            if model in out["cards"]:
+                entry = out["cards"][model]
+                entry["DESCRIPTION"] = description
+                entry.pop("UPGRADE_DESCRIPTION", None)
+            else:
+                out["powers"][model]["DESCRIPTIONS"] = [description]
+        for model in ("MobFullRotation", "MobWizardSchool"):
+            out["cards"][model].pop("UPGRADE_DESCRIPTION", None)
         link_keywords(jar, base, lang, out)
         result[lang] = out
     return result

@@ -11,24 +11,36 @@ internal static class OriginalRoomVisuals
 {
     private static readonly string[] Names = ["angry", "fat", "shield", "sneak", "wizard"];
 
-    private static void ReplaceFigures(Node2D host, Player player, float spacing, float scale)
+    private static void ShowMerchantFigures(NMerchantCharacter host, Player player)
     {
         if (MobRosterRelic.For(player) is not { } roster || OriginalAssets.Picture("char/angry/skeleton") == null) return;
-        var formation = roster.Formation();
-        foreach (var old in host.GetChildren().OfType<Node2D>().Where(node => node.GetClass() == "SpineSprite"))
-            old.Modulate = Colors.Transparent;
+        if (host.HasNode("GremlinMobMerchantVisuals")) return;
 
-        var display = new Node2D { Name = "GremlinMobOriginalRoomVisuals" };
+        bool alternate = SkinPicker.UseFor(player);
+        // The single-player merchant has a full rug for the party; multiplayer uses a grid of character slots.
+        bool singlePlayer = player.RunState.Players.Count == 1;
+        float spacing = singlePlayer ? (alternate ? 98f : 72f) : (alternate ? 76f : 48f);
+        float scale = singlePlayer ? 1.10f : .60f;
+        var formation = roster.Formation();
+        var display = new Node2D { Name = "GremlinMobMerchantVisuals" };
         host.AddChild(display);
         for (int i = 0; i < formation.Length; i++)
         {
             string name = Names[(int)formation[i].Fighter];
-            if ((OriginalAssets.Spine(name, SkinPicker.UseFor(player)) ?? OriginalAssets.Spine(name)) is not { } sprite) continue;
+            if ((OriginalAssets.Spine(name, alternate) ?? OriginalAssets.Spine(name)) is not { } sprite) continue;
             sprite.Scale = Vector2.One * scale;
             sprite.Position = new Vector2(((formation.Length - 1) * .5f - i) * spacing, 0);
             display.AddChild(sprite);
             OriginalAssets.PlayIdle(sprite, name);
         }
+
+        if (display.GetChildCount() == 0)
+        {
+            display.QueueFree();
+            return;
+        }
+        foreach (var old in host.GetChildren().OfType<Node2D>().Where(node => node.GetClass() == "SpineSprite"))
+            old.Modulate = Colors.Transparent;
     }
 
     [HarmonyPatch(typeof(NRestSiteCharacter), nameof(NRestSiteCharacter._Ready))]
@@ -57,7 +69,7 @@ internal static class OriginalRoomVisuals
         private static void Postfix(List<Player> ____players, List<NMerchantCharacter> ____playerVisuals)
         {
             for (int i = 0; i < Math.Min(____players.Count, ____playerVisuals.Count); i++)
-                ReplaceFigures(____playerVisuals[i], ____players[i], 48f, .60f);
+                ShowMerchantFigures(____playerVisuals[i], ____players[i]);
         }
     }
 }

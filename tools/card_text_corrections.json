@@ -1,0 +1,65 @@
+{
+  "eng": {
+    "MobPocketLift": "Deal !D! damage. NL Gain !blamage! Gold. NL Exhaust.",
+    "MobRaid": "Scry 1 for each living Gremlin. NL Draw !M! cards.",
+    "MobPocketArmory": "At the start of your turn, draw 1 card and add a *Ward+ to your discard pile.",
+    "MobBiteTheShield": "Convert your Block into expansioncontent:Temp_HP.",
+    "MobGuardfire": "When drawn, draw 2 cards. NL Deal !D! damage. NL Whenever you would gain Block this turn, instead deal that much damage to ALL enemies.",
+    "MobPocketPowder": "Add 2 *Wards to your discard pile. NL Draw !M! cards. NL Exhaust.",
+    "MobWardMakerPower": "At the start of your turn, draw {Amount} and add that many [gold]Ward+[/gold] to your discard pile."
+  },
+  "fra": {
+    "MobPocketLift": "Infligez !D! dégâts. NL Gagnez !blamage! pièces d’or. NL Épuisement.",
+    "MobRaid": "Scrutez 1 carte par Diablotin vivant. NL Piochez !M! cartes.",
+    "MobPocketArmory": "Au début de votre tour, piochez 1 carte et ajoutez une *Protection+ à votre défausse.",
+    "MobGuardfire": "Lorsque cette carte est piochée, piochez 2 cartes. NL Infligez !D! dégâts. NL Lorsque vous gagnez de l'Armure ce tour, à la place infligez autant de dégâts à TOUS les ennemis.",
+    "MobPocketPowder": "Ajoutez 2 *Protections à votre défausse. NL Piochez !M! cartes. NL Épuisement.",
+    "MobWardMakerPower": "Au début de votre tour, piochez {Amount} carte(s) et ajoutez autant de [gold]Protection+[/gold] à votre défausse."
+  },
+  "jpn": {
+    "MobPocketLift": "!D! ダメージを与える。 NL !blamage! ゴールドを得る。 NL 廃棄",
+    "MobRaid": "生存しているグレムリンの数だけ 占術 する。 NL カードを !M! 枚引く。",
+    "MobPocketArmory": "ターン開始時、カードを1枚引き、捨て札に *ガード+ を1枚加える。",
+    "MobBiteTheShield": "ブロックを expansioncontent:一時的な体力 に変換する。",
+    "MobGuardfire": "このカードを引いた時、カードを2枚引く。 NL !D! ダメージを与える。 NL このターンあなたがブロックを得る代わりに敵全体に同じダメージを与える。",
+    "MobPocketPowder": "捨て札に *ガード を2枚加える。 NL カードを !M! 枚引く。 NL 廃棄",
+    "MobWardMakerPower": "ターン開始時、カードを {Amount} 枚引き、同じ枚数の [gold]ガード+[/gold] を捨て札に加える。"
+  },
+  "kor": {
+    "MobPocketLift": "피해를 !D! 줍니다. NL 골드를 !blamage! 얻습니다. NL 소멸.",
+    "MobRaid": "살아 있는 그렘린 수만큼 예지 합니다. NL 카드를 !M! 장 뽑습니다.",
+    "MobPocketArmory": "내 턴 시작 시 카드 1장을 뽑고 버린 카드 더미에 *수호+ 를 1장 추가합니다.",
+    "MobBiteTheShield": "방어도를 같은 양의 expansioncontent:임시 *체력 으로 변환합니다.",
+    "MobGuardfire": "이 카드를 뽑을 때 카드 2장을 뽑습니다. NL 피해를 !D! 줍니다. NL 이번 턴 동안 방어도를 얻는 대신 적 전체에게 그만큼 피해를 줍니다.",
+    "MobPocketPowder": "버린 카드 더미에 *수호 를 2장 추가합니다. NL 카드를 !M! 장 뽑습니다. NL 소멸.",
+    "MobWardMakerPower": "내 턴 시작 시 카드를 {Amount}장 뽑고 버린 카드 더미에 그만큼 [gold]수호+[/gold]를 추가합니다."
+  },
+  "ptb": {
+    "MobPocketLift": "Cause !D! de dano. NL Ganhe !blamage! de Ouro. NL Exaurir.",
+    "MobRaid": "Faça Vidência 1 para cada Gremlin vivo. NL Compre !M! cartas.",
+    "MobPocketArmory": "No início do seu turno, compre 1 carta e adicione uma *Proteção+ à sua pilha de descarte.",
+    "MobGuardfire": "Ao comprar esta carta, compre 2 cartas. NL Cause !D! de dano. NL Sempre que você ganharia Proteção neste turno, em vez disso cause esse tanto de dano a TODOS os inimigos.",
+    "MobPocketPowder": "Adicione 2 *Proteções à sua pilha de descarte. NL Compre !M! cartas. NL Exaurir.",
+    "MobWardMakerPower": "No início do seu turno, compre {Amount} e adicione a mesma quantidade de [gold]Proteção+[/gold] à sua pilha de descarte."
+  },
+  "rus": {
+    "MobPocketLift": "Наносит !D! урона. NL Вы получаете !blamage! золота. NL Сжигается.",
+    "MobRaid": "Предсказываете по 1 карте за каждого живого Гремлина. NL Вы берёте !M! карты.",
+    "MobPocketArmory": "В начале вашего хода вы берёте 1 карту и добавляете *Опеку+ в сброс.",
+    "MobGuardfire": "Когда вы берёте эту карту, возьмите ещё 2 карты. NL Наносит !D! урона. NL Вместо получения Защиты в этом ходу вы наносите столько же урона ВСЕМ врагам.",
+    "MobPocketPowder": "Вы добавляете 2 *Опеки в сброс. NL Вы берёте !M! карты. NL Сжигается.",
+    "MobWardMakerPower": "В начале вашего хода вы берёте {Amount} и добавляете столько же карт [gold]Опека+[/gold] в сброс."
+  },
+  "zhs": {
+    "MobPocketLift": "造成 !D! 点伤害。 NL 获得 !blamage! 金币。 NL 消耗 。"
+  },
+  "zht": {
+    "MobPocketLift": "造成 !D! 點傷害。 NL 獲得 !blamage! 金幣。 NL 消耗 。",
+    "MobRaid": "預見 存活的地精數量。 NL 抽 !M! 張牌。",
+    "MobPocketArmory": "回合開始時抽1張牌，棄牌堆加入等量 *守衛+ 。",
+    "MobBiteTheShield": "將你的 格擋 轉換為等量 expansioncontent:臨時生命 。",
+    "MobGuardfire": "抽到時，抽2張牌。 NL 造成 !D! 點傷害。 NL 本回合每獲得 格擋 ， NL 改為造成等量群體傷害。",
+    "MobPocketPowder": "棄牌堆加入2張 *守衛 。 NL 抽 !M! 張牌。 NL 消耗 。",
+    "MobWardMakerPower": "你的回合開始時，抽 {Amount} 張牌並將等量 [gold]守衛+[/gold] 加入棄牌堆。"
+  }
+}

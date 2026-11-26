@@ -30,6 +30,9 @@ public abstract partial class MobRosterRelic : MobRelic
     internal Fighter[] Reserves => Line.Skip(1).Where(x => x.Hp > 0).Select(x => x.Fighter).ToArray();
     internal bool HasFallen => Line.Skip(1).Any(x => x.Hp == 0);
 
+    [SavedProperty]
+    public bool OverpoweredMode { get; set; }
+
     // Slot zero uses the native creature's current HP. A reserve at 0 is fallen and -1 is pledged.
     [SavedProperty]
     public string GremlinMobLine

@@ -9,6 +9,6 @@ public sealed class MobRevivalRite() : DescribedMobCard(
     protected override bool IsPlayable => ChargeCount >= 3 && Crew?.HasFallen == true;
     protected override async Task OnPlay(PlayerChoiceContext ctx, CardPlay play)
     {
-        if (Crew is { } crew && crew.ReviveRandom(EffectAmount)) await crew.SpendCharge(ctx, ChargeCount);
+        if (Crew is { } crew && crew.ReviveRandom(EffectAmount)) await crew.ClearCharge();
     }
 }

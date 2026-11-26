@@ -109,9 +109,12 @@ public sealed class MobHoldStrength : MobPower
 
 public sealed class MobEvadeAndRotate : MobPower
 {
-    public override decimal ModifyHpLostAfterOstyLate(Creature target, decimal amount, ValueProp props, Creature? dealer, CardModel? source)
+    public override decimal ModifyHpLostAfterOstyLate(Creature target, decimal amount, ValueProp props, Creature? dealer, CardModel? source) =>
+        target == Owner && !Owner.HasPower<MobTemporaryGuard>() ? PreventHpLoss(amount) : amount;
+
+    internal decimal PreventHpLoss(decimal amount)
     {
-        if (target != Owner || amount < 1 || Amount <= 0) return amount;
+        if (amount < 1 || Amount <= 0) return amount;
         TemporaryHpDamage.Record(this, 1);
         return 0;
     }
@@ -152,7 +155,4 @@ public sealed class MobRampageForm : MobPower
             combat.CreateCard<MobRampageRoar>(player), combat.CreateCard<MobRampageBash>(player), combat.CreateCard<MobRampageRush>(player)
         ], PileType.Hand, player);
     }
-
-    public override Task AfterDamageReceived(PlayerChoiceContext context, Creature target, DamageResult result, ValueProp props, Creature? dealer, CardModel? source) =>
-        target == Owner && target.GetPowerAmount<MobTemporaryGuard>() == 0 ? PowerCmd.Remove(this) : Task.CompletedTask;
 }

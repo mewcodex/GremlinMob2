@@ -14,8 +14,10 @@ using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Modding;
 using MegaCrit.Sts2.Core.Localization;
+using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Encounters;
+using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
@@ -95,12 +97,13 @@ public static class Probe
     private static async Task Run(NMainMenu mainMenu)
     {
         var tree = mainMenu.GetTree();
-        bool skinTest = OS.GetCmdlineUserArgs().Contains("gremlin-check-skin");
+        string[] args = OS.GetCmdlineUserArgs();
+        bool skinTest = args.Contains("gremlin-check-skin");
         string rigPrefix = skinTest ? "FeminizationSpine_" : "OriginalSpine_";
         try
         {
             await tree.ToSignal(tree.CreateTimer(.6), SceneTreeTimer.SignalName.Timeout);
-            if (OS.GetCmdlineUserArgs().Contains("gremlin-check-sync-assets"))
+            if (args.Contains("gremlin-check-sync-assets") && !args.Contains("gremlin-check-no-preload"))
                 MegaCrit.Sts2.Core.Assets.PreloadManager.Enabled = true;
             if (OS.GetCmdlineUserArgs().Contains("gremlin-export-card-art"))
             {
@@ -234,6 +237,19 @@ public static class Probe
             button.GrabFocus();
             picker.SelectCharacter(button);
             NModalContainer.Instance?.Clear();
+            var strength = picker.GetNode<OptionButton>("GremlinStrengthPicker");
+            Check(strength.GetItemText(0) == "传统模式" && strength.GetItemText(1) == "超模模式",
+                "native character selection offers both strength modes");
+            if (args.Contains("gremlin-check-strength"))
+            {
+                await TestOverpoweredMode(tree, picker, button, strength);
+                Console.WriteLine("GREMLIN_STRENGTH_OK");
+                tree.Quit();
+                return;
+            }
+            strength.GetPopup().EmitSignal(PopupMenu.SignalName.IndexPressed, 0);
+            if (!skinTest && picker.GetNodeOrNull<Label>("GremlinSkinPicker/SkinChoice")?.Text == "娘化皮肤 by anaertailin")
+                picker.GetNode<TextureButton>("GremlinSkinPicker/NextSkin").EmitSignal(BaseButton.SignalName.Pressed);
             if (skinTest)
             {
                 var skin = Descendants(picker).OfType<HBoxContainer>().Single(node => node.Name == "GremlinSkinPicker");
@@ -327,6 +343,7 @@ public static class Probe
                 "archived 10-card opening deck, 99 gold, 16 HP per member, and starter relic");
             var acts = ActModel.GetRandomList(new Rng(39, "gremlin-mob-smoke"), UnlockState.all, false).ToArray();
             await NGame.Instance!.StartNewSingleplayerRun(player, true, acts, [], "MOBSMOKE", GameMode.Standard, false);
+            Check(!bell.OverpoweredMode, "new traditional run keeps the overpowered rules off");
             NModalContainer.Instance?.Clear();
             SaveManager.Instance.MarkFtueAsComplete("combat_rules_ftue");
             var tooth = (ArchaicTooth)ModelDb.Relic<ArchaicTooth>().ToMutable();
@@ -361,6 +378,78 @@ public static class Probe
             var combat = body.CombatState!;
             var enemy = combat.HittableEnemies.First();
             var context = new ThrowingPlayerChoiceContext();
+            if (args.Contains("gremlin-check-card-sync"))
+            {
+                var formation = combat.CreateCard<MobFullRotation>(player);
+                CardCmd.Upgrade(formation, CardPreviewStyle.None);
+                Check(formation.EnergyCost.GetResolved() == 1 && !formation.Keywords.Contains(CardKeyword.Innate),
+                    "Conga Line upgrades to 1 energy with the original turn-start effect");
+                await PowerCmd.Apply<MobRotationRhythm>(context, body, 2, body, null);
+                int energyBeforeRotation = player.PlayerCombatState.Energy;
+                string frontBeforeRotation = bell.GremlinMobLine.Split(',')[0];
+                await body.GetPower<MobRotationRhythm>()!.BeforeHandDraw(player, context, combat);
+                Check(player.PlayerCombatState.Energy == energyBeforeRotation + 2 &&
+                    bell.GremlinMobLine.Split(',')[^1] == frontBeforeRotation,
+                    "two stacks of Conga Line grant 2 energy and rotate exactly once");
+                await PowerCmd.Remove<MobRotationRhythm>(body);
+
+                var fury = combat.CreateCard<MobPoweredFury>(player);
+                await CardPileCmd.Add(fury, PileType.Hand);
+                Check(fury.EnergyCost.GetResolved() == 4, "Fury costs 4 without Strength");
+                await PowerCmd.Apply<StrengthPower>(context, body, 5, body, null);
+                Check(fury.EnergyCost.GetResolved() == 2, "Fury costs 2 with 5 Strength");
+                await PowerCmd.Apply<StrengthPower>(context, body, 3, body, null);
+                Check(fury.EnergyCost.GetResolved() == 0, "Fury costs 0 with 8 Strength");
+                await PowerCmd.Remove<StrengthPower>(body);
+                Check(fury.EnergyCost.GetResolved() == 4 && fury.EnergyCost.GetResolved() == 4,
+                    "Fury restores its cost after losing all Strength");
+                await CardPileCmd.Add(fury, PileType.Exhaust);
+
+                await PowerCmd.Apply<ArtifactPower>(context, enemy, 1, enemy, null);
+                var theft = combat.CreateCard<MobDisarmTheft>(player);
+                await CardPileCmd.Add(theft, PileType.Hand);
+                int enemyStrength = enemy.GetPowerAmount<StrengthPower>();
+                Check(theft.TryManualPlay(enemy), "Arms Theft played against 1 Artifact");
+                await WaitFor(tree, () => CombatManager.Instance.History.CardPlaysFinished.Any(entry => entry.CardPlay.Card == theft));
+                Check(enemy.GetPowerAmount<ArtifactPower>() == 0 && enemy.GetPowerAmount<StrengthPower>() == enemyStrength - 1 &&
+                    body.GetPowerAmount<StrengthPower>() == 1, "Arms Theft gains the Strength that remains stealable after Weak consumes Artifact");
+
+                var dazzle = combat.CreateCard<MobSpellDazzle>(player);
+                await CardPileCmd.Add(dazzle, PileType.Hand);
+                await PowerCmd.Apply<ArtifactPower>(context, enemy, 1, enemy, null);
+                await PowerCmd.Apply<MobChargePower>(context, body, 3, body, null);
+                Check(dazzle.TryManualPlay(enemy), "Dazzle played with Wiz against 1 Artifact");
+                await WaitFor(tree, () => CombatManager.Instance.History.CardPlaysFinished.Any(entry => entry.CardPlay.Card == dazzle));
+                Check(enemy.GetPowerAmount<ArtifactPower>() == 0 && enemy.GetPowerAmount<StrengthPower>() == enemyStrength - 1 &&
+                    body.GetPowerAmount<StrengthPower>() == 1, "Dazzle gains no Strength when Artifact blocks the theft");
+
+                var discard = player.PlayerCombatState.DiscardPile;
+                var hand = player.PlayerCombatState.Hand;
+                int handBeforeWard = hand.Cards.Count;
+                await PowerCmd.Apply<MobWardMakerPower>(context, body, 1, body, null);
+                await body.GetPower<MobWardMakerPower>()!.BeforeHandDraw(player, context, combat);
+                Check(hand.Cards.Count == handBeforeWard + 1 && discard.Cards.Single() is MobPaperWard { IsUpgraded: true },
+                    "Infinite Blocks draws a card and adds an upgraded Ward to the discard pile");
+
+                var flipOut = combat.CreateCard<MobGuardfire>(player);
+                await CardPileCmd.Add(flipOut, PileType.Draw, CardPilePosition.Top);
+                int handBeforeFlip = hand.Cards.Count;
+                await CardPileCmd.Draw(context, 1, player);
+                Check(hand.Cards.Contains(flipOut) && hand.Cards.Count == handBeforeFlip + 3, "drawing Flip Out draws two additional cards");
+                await CardPileCmd.Add(flipOut, PileType.Exhaust);
+
+                await CreatureCmd.Kill(body);
+                var revive = combat.CreateCard<MobRevivalRite>(player);
+                await CardPileCmd.Add(revive, PileType.Hand);
+                await PowerCmd.Apply<MobChargePower>(context, body, 6, body, null);
+                Check(revive.TryManualPlay(null), "Necromancy plays with more than 3 Wiz");
+                await WaitFor(tree, () => CombatManager.Instance.History.CardPlaysFinished.Any(entry => entry.CardPlay.Card == revive));
+                Check(bell.GremlinMobLine.EndsWith(":10") && !body.HasPower<MobChargePower>() && !body.HasPower<MobBangPower>(),
+                    "Necromancy revives a Gremlin and clears every stack of Wiz and Bang");
+                Check(true, "card synchronization checks complete");
+                tree.Quit();
+                return;
+            }
             var indicator = body.Powers.OfType<MobFighterPassive>().Single();
             string firstPassive = indicator.Title.GetFormattedText();
             Check(firstPassive.Length > 0 && indicator.Description.GetFormattedText().Length > 0 &&
@@ -410,7 +499,7 @@ public static class Probe
             Check(Descendants(actor).OfType<Label>().Count(label => label.Name == "ReserveHp" && label.IsVisibleInTree()) == 4
                 && Descendants(actor).OfType<Label>().Any(label => label.Name == "ReserveHp" && label.IsVisibleInTree() && label.Text == "12"),
                 "legacy standby HP numbers display four reserves and outgoing member's 12 HP");
-            CheckReserveHover(actor);
+            await CheckReserveHover(tree, actor);
             tree.Root.GetTexture().GetImage().SavePng(Path.Combine(Path.GetDirectoryName(OS.GetExecutablePath())!, "mob-formation.png"));
 
             var handoff = combat.CreateCard<MobPickFront>(player);
@@ -466,11 +555,42 @@ public static class Probe
             await PowerCmd.Remove<MobChargePower>(body);
             body.SetCurrentHpInternal(body.MaxHp);
 
+            var healthBar = actor.GetNode<NCreatureStateDisplay>("%HealthBar").GetNode<NHealthBar>("%HealthBar");
+            var temporaryHpBadge = healthBar.HpBarContainer.GetNode<TextureRect>("TemporaryHpBadge");
+            var temporaryHpOutline = healthBar.HpBarContainer.GetNode<Control>("TemporaryHpOutline");
+            var temporaryHpAmount = temporaryHpBadge.GetNode<Label>("Amount");
+            Check(!temporaryHpBadge.Visible && !temporaryHpOutline.Visible, "temporary HP display starts hidden");
             await PowerCmd.Apply<MobTemporaryGuard>(context, body, 4, body, null);
+            Check(temporaryHpBadge.IsVisibleInTree() && temporaryHpOutline.IsVisibleInTree() && temporaryHpAmount.Text == "4" &&
+                temporaryHpBadge.Texture.GetSize() == new Vector2(64, 64) &&
+                temporaryHpOutline.GetChildren().OfType<TextureRect>().All(piece =>
+                    piece.Texture != null && piece.Position.Y < 0 && piece.Size.Y > healthBar.HpBarContainer.Size.Y &&
+                    piece.Material is CanvasItemMaterial { BlendMode: CanvasItemMaterial.BlendModeEnum.Add }) &&
+                temporaryHpOutline.GetIndex() < healthBar.GetNode<Control>("%BlockOutline").GetIndex() &&
+                healthBar.GetNode<Control>("%BlockContainer").IsVisibleInTree(),
+                "original gold temporary HP shield and outline render beside native Block");
+            await tree.ToSignal(tree.CreateTimer(.5), SceneTreeTimer.SignalName.Timeout);
+            string screenshotDir = Path.GetDirectoryName(OS.GetExecutablePath())!;
+            tree.Root.GetTexture().GetImage().SavePng(Path.Combine(screenshotDir, "mob-temporary-hp.png"));
+            int activeBlock = body.Block;
+            await CreatureCmd.LoseBlock(context, body, activeBlock, null);
+            healthBar.RefreshValues();
+            Check(body.Block == 0 && temporaryHpBadge.IsVisibleInTree() && temporaryHpOutline.IsVisibleInTree() &&
+                !healthBar.GetNode<Control>("%BlockOutline").Visible, "the gold outer frame stays visible with zero Block");
+            var caps = temporaryHpOutline.GetChildren().OfType<TextureRect>().ToArray();
+            Check(caps[0].Position.X + caps[0].Size.X == caps[1].Position.X &&
+                caps[1].Position.X + caps[1].Size.X == caps[2].Position.X &&
+                caps[1].Position.X > healthBar.GetNode<Control>("%HpForegroundContainer").OffsetLeft,
+                "gold frame caps join the center strip and follow the inset HP bar");
+            await tree.ToSignal(tree.CreateTimer(.55), SceneTreeTimer.SignalName.Timeout);
+            tree.Root.GetTexture().GetImage().SavePng(Path.Combine(screenshotDir, "mob-temporary-hp-without-block.png"));
+            await CreatureCmd.GainBlock(body, activeBlock, ValueProp.Unpowered, null);
             await CreatureCmd.Damage(context, body, 3, ValueProp.Unblockable | ValueProp.Unpowered, enemy);
             Check(body.CurrentHp == 16 && body.GetPowerAmount<MobTemporaryGuard>() == 1, "partial temporary HP absorption");
+            Check(temporaryHpBadge.Visible && temporaryHpAmount.Text == "1", "the gold shield updates on absorption without real HP loss");
             await CreatureCmd.Damage(context, body, 4, ValueProp.Unblockable | ValueProp.Unpowered, enemy);
             Check(body.CurrentHp == 13 && body.GetPowerAmount<MobTemporaryGuard>() == 0, "temporary HP depletion");
+            Check(!temporaryHpBadge.Visible && !temporaryHpOutline.Visible, "the gold shield and outline disappear on depletion");
             await CreatureCmd.Damage(context, body, 50, ValueProp.Unblockable | ValueProp.Unpowered, enemy);
             Check(body.IsAlive && bell.GremlinMobLine.EndsWith(":0") && actor.GetChildren().OfType<Node2D>()
                 .Count(node => node.Visible && node.Name.ToString().StartsWith("MobFighter_")) == 4,
@@ -492,6 +612,7 @@ public static class Probe
             await CreatureCmd.Damage(context, body, 50, ValueProp.Unblockable | ValueProp.Unpowered, enemy);
             Check(!bell.GremlinMobLine.StartsWith(active) && bell.GremlinMobLine.EndsWith(active) &&
                 body.GetPowerAmount<MobEvadeAndRotate>() == 0, "scatter prevents a lethal hit and randomly rotates once");
+            await CheckScatterAndTemporaryHp(player, bell, enemy);
 
             var rampage = combat.CreateCard<MobJuggernaut>(player);
             await PlayerCmd.GainEnergy(4, player);
@@ -504,10 +625,23 @@ public static class Probe
                 node.Visible && new MegaSprite(node).IsAnimationStateReady()));
             Check(true, "original Juggernaut Spine initialized");
             CheckRigScale(Descendants(actor).OfType<Node2D>().Single(node => node.Name == rigPrefix + "nob"));
+            await CheckNobSwapLock(tree, player, bell);
             hp = body.CurrentHp;
+            await PowerCmd.Apply<MobEvadeAndRotate>(context, body, 1, body, null);
+            string nobLine = bell.GremlinMobLine;
             await CreatureCmd.Damage(context, body, 50, ValueProp.Unblockable | ValueProp.Unpowered, enemy);
-            Check(body.CurrentHp == hp && !body.HasPower<MobRampageForm>() && body.HasPower<MobFighterPassive>(),
-                "juggernaut cancels overflow and restores the passive on leaving form");
+            Check(body.CurrentHp == hp && !body.HasPower<MobRampageForm>() && body.HasPower<MobFighterPassive>() &&
+                body.GetPowerAmount<MobEvadeAndRotate>() == 1 && bell.GremlinMobLine == nobLine,
+                "juggernaut cancels overflow and restores the passive on leaving form without spending Scatter");
+            await PowerCmd.Remove<MobEvadeAndRotate>(body);
+
+            await PowerCmd.Apply<MobTemporaryGuard>(context, body, 3, body, null);
+            await PowerCmd.Apply<MobRampageForm>(context, body, 1, body, null);
+            Check(temporaryHpBadge.Visible && temporaryHpAmount.Text == "3", "the same shield displays Nob's temporary HP");
+            await PowerCmd.Remove<MobTemporaryGuard>(body);
+            Check(!body.HasPower<MobRampageForm>() && body.HasPower<MobFighterPassive>(),
+                "removing temporary HP directly releases the Nob swap lock immediately");
+            Check(!temporaryHpBadge.Visible && !temporaryHpOutline.Visible, "removing the power clears the temporary HP display immediately");
 
             await CreatureCmd.GainMaxHp(body, 7);
             Check(body.MaxHp == 18 && bell.GremlinMobLine.Split(',').All(entry => int.Parse(entry.Split(':')[1]) <= 18),
@@ -594,8 +728,23 @@ public static class Probe
             Check(Descendants(rest).OfType<Node2D>().Any(node => node.Name == "GremlinMobOriginalRoomVisuals"),
                 "native rest site uses original Gremlin sprites");
             await RunManager.Instance.EnterRoomDebug(RoomType.Shop, showTransition: false);
-            Check(Descendants(NMerchantRoom.Instance!).OfType<Node2D>().Any(node => node.Name == "GremlinMobOriginalRoomVisuals"),
-                "native merchant uses original Gremlin sprites");
+            var shop = NMerchantRoom.Instance!;
+            var merchantFigures = shop.PlayerVisuals[0].GetNode<Node2D>("GremlinMobMerchantVisuals").GetChildren().OfType<Node2D>().ToArray();
+            int livingMembers = bell.GremlinMobLine.Split(',').Count(entry => int.Parse(entry.Split(':')[1]) > 0);
+            Check(merchantFigures.Length == livingMembers && merchantFigures.All(sprite =>
+                sprite.Name.ToString().StartsWith(rigPrefix, StringComparison.Ordinal) && sprite.IsVisibleInTree()),
+                "native merchant displays all living gremlins in the selected skin");
+            await WaitFor(tree, () => merchantFigures.All(sprite => new MegaSprite(sprite).TryGetAnimationState()?.GetCurrentAnimationDuration() > 0));
+            var trackTimes = merchantFigures.Select(TrackTime).ToArray();
+            await tree.ToSignal(tree.CreateTimer(.5), SceneTreeTimer.SignalName.Timeout);
+            tree.Root.GetTexture().GetImage().SavePng(Path.Combine(Path.GetDirectoryName(OS.GetExecutablePath())!,
+                skinTest ? "mob-merchant-feminization.png" : "mob-merchant-original.png"));
+            shop.OpenInventory();
+            await tree.ToSignal(tree.CreateTimer(1.1), SceneTreeTimer.SignalName.Timeout);
+            Check(shop.Inventory.IsOpen && merchantFigures.Zip(trackTimes).All(pair =>
+                pair.First.IsVisibleInTree() && TrackTime(pair.First) > pair.Second),
+                "native merchant gremlins keep playing their idle animations with the inventory open");
+            shop.Inventory.Close();
 
             if (OS.GetCmdlineUserArgs().Contains("gremlin-check-mixed"))
                 await TestMeltedRoster(tree, player, bell);
@@ -609,6 +758,81 @@ public static class Probe
             Console.WriteLine("GREMLIN_SMOKE_FAIL " + error);
             tree.Quit(1);
         }
+    }
+
+    private static float TrackTime(Node2D sprite)
+    {
+        using var track = new MegaSprite(sprite).GetAnimationState().GetCurrent(0);
+        return track?.GetTrackTime() ?? 0;
+    }
+
+    private static async Task TestOverpoweredMode(SceneTree tree, NCharacterSelectScreen picker,
+        NCharacterSelectButton button, OptionButton strength)
+    {
+        await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+        if (picker.GetNodeOrNull<Control>("GremlinSkinPicker") is { } skin)
+            Check(strength.GetGlobalRect().End.Y <= skin.GetGlobalRect().Position.Y,
+                "strength selector sits above the skin selector");
+        strength.GetPopup().EmitSignal(PopupMenu.SignalName.IndexPressed, 1);
+        picker.SelectCharacter(button);
+        Check(picker.GetNode<OptionButton>("GremlinStrengthPicker").Selected == 1,
+            "the overpowered character-select choice survives reopening the controls");
+        await tree.ToSignal(tree.CreateTimer(.8), SceneTreeTimer.SignalName.Timeout);
+        tree.Root.GetTexture().GetImage().SavePng(Path.Combine(Path.GetDirectoryName(OS.GetExecutablePath())!, "mob-strength-picker.png"));
+
+        var player = Player.CreateForNewRun(button.Character, UnlockState.all, 1);
+        var bell = player.Relics.OfType<MobRotationBell>().Single();
+        var acts = ActModel.GetRandomList(new Rng(39, "gremlin-strength-smoke"), UnlockState.all, false).ToArray();
+        await NGame.Instance!.StartNewSingleplayerRun(player, true, acts, [], "MOBSTRENGTH", GameMode.Standard, false);
+        Check(bell.OverpoweredMode && Player.FromSerializable(player.ToSerializable()).Relics.OfType<MobRosterRelic>()
+            .Single().OverpoweredMode, "the selected strength is saved with the new run");
+        NModalContainer.Instance?.Clear();
+        SaveManager.Instance.MarkFtueAsComplete("combat_rules_ftue");
+
+        var manager = RunManager.Instance;
+        var body = player.Creature;
+        await manager.EnterRoomDebug(RoomType.Monster, model: ModelDb.Encounter<NibbitsWeak>().ToMutable(), showTransition: false);
+        await WaitFor(tree, () => player.PlayerCombatState?.Phase == PlayerTurnPhase.Play);
+        body.SetCurrentHpInternal(11);
+        bell.GremlinMobLine = "0:11,1:0,2:7,3:-1,4:0";
+        var combat = body.CombatState!;
+        var enemy = combat.HittableEnemies.Single();
+        enemy.SetCurrentHpInternal(1);
+        var attack = combat.CreateCard<MobStrike>(player);
+        await CardPileCmd.Add(attack, PileType.Hand);
+        Check(attack.TryManualPlay(enemy), "a real attack can finish the overpowered combat");
+        await WaitFor(tree, () => NOverlayStack.Instance?.Peek() is NRewardsScreen);
+        Check(bell.GremlinMobLine == "0:11,1:1,2:7,3:-1,4:1",
+            "victory revives every fallen gremlin to one HP and preserves living and pledged members");
+        NOverlayStack.Instance!.Clear();
+
+        var crown = (MobRotatingBell)ModelDb.Relic<MobRotatingBell>().ToMutable();
+        await RelicCmd.Obtain(crown, player);
+        Check(crown.OverpoweredMode && crown.GremlinMobLine == bell.GremlinMobLine,
+            "the upgraded roster relic retains the chosen strength");
+        await RelicCmd.Obtain(ModelDb.Relic<MobSpareGrave>().ToMutable(), player);
+        var restPoint = ((RunState)player.RunState).Map.GetAllMapPoints().First(point => point.PointType == MapPointType.RestSite);
+        await manager.EnterMapCoord(restPoint.coord);
+        var rest = manager.RestSiteSynchronizer;
+        int index = rest.GetLocalOptions().ToList().FindIndex(option => option.OptionId == "MOB_REVIVE");
+        Check(index >= 0 && rest.GetLocalOptions()[index].IsEnabled,
+            "the Gravestone option is enabled when all eligible gremlins are alive");
+        var cancel = rest.ChooseLocalOption(index);
+        await WaitFor(tree, () => NOverlayStack.Instance?.Peek() is NSimpleCardSelectScreen);
+        AccessTools.Method(typeof(NSimpleCardSelectScreen), "CompleteSelection").Invoke(NOverlayStack.Instance!.Peek(), []);
+        Check(!await cancel && rest.GetLocalOptions()[index].IsEnabled, "an empty choice leaves the Gravestone option available");
+        var choose = rest.ChooseLocalOption(index);
+        await WaitFor(tree, () => NOverlayStack.Instance?.Peek() is NSimpleCardSelectScreen);
+        var screen = (NSimpleCardSelectScreen)NOverlayStack.Instance!.Peek()!;
+        var options = Descendants(screen).OfType<NCard>().Select(node => node.Model).OfType<FighterOption>().Distinct().ToArray();
+        Check(options.Length == 4 && options.All(card => card is not MobScoutOption) &&
+            options.OfType<MobGuardOption>().Single().Title.EndsWith("(7/16)", StringComparison.Ordinal),
+            "the Gravestone shows living gremlins and excludes the pledged member");
+        AccessTools.Method(typeof(NSimpleCardSelectScreen), "OnCardClicked").Invoke(screen, [options.OfType<MobGuardOption>().Single()]);
+        AccessTools.Method(typeof(NSimpleCardSelectScreen), "CompleteSelection").Invoke(screen, []);
+        Check(await choose && crown.GremlinMobLine == "0:11,1:1,2:16,3:-1,4:1" &&
+            rest.GetLocalOptions().Any(option => option.OptionId == "HEAL"),
+            "the Gravestone fully heals the chosen living reserve and leaves ordinary rest available");
     }
 
     private static void CheckEffectIcons(GremlinMobCharacter character)
@@ -803,6 +1027,91 @@ public static class Probe
         Check(true, "front uses native actor origin and occupied reserves keep original 90-unit slot spacing");
     }
 
+    private static async Task CheckScatterAndTemporaryHp(Player player, MobRosterRelic bell, MegaCrit.Sts2.Core.Entities.Creatures.Creature enemy)
+    {
+        var body = player.Creature;
+        var context = new ThrowingPlayerChoiceContext();
+        string saved = bell.GremlinMobLine;
+        int hp = body.CurrentHp;
+        const ValueProp incoming = ValueProp.Unblockable | ValueProp.Unpowered;
+
+        foreach (bool scatterFirst in new[] { false, true })
+        {
+            if (scatterFirst) await PowerCmd.Apply<MobEvadeAndRotate>(context, body, 1, body, null);
+            await PowerCmd.Apply<MobTemporaryGuard>(context, body, 4, body, null);
+            if (!scatterFirst) await PowerCmd.Apply<MobEvadeAndRotate>(context, body, 1, body, null);
+
+            await CreatureCmd.Damage(context, body, 3, incoming, enemy);
+            Check(bell.GremlinMobLine == saved && body.GetPowerAmount<MobTemporaryGuard>() == 1 &&
+                body.GetPowerAmount<MobEvadeAndRotate>() == 1,
+                $"a hit fully absorbed by temporary HP keeps Scatter and the formation (Scatter first: {scatterFirst})");
+
+            await CreatureCmd.Damage(context, body, 4, incoming, enemy);
+            Check(!body.HasPower<MobTemporaryGuard>() && !body.HasPower<MobEvadeAndRotate>() &&
+                bell.GremlinMobLine.Split(',')[^1] == saved.Split(',')[0],
+                $"Scatter protects the previous leader from overflow and swaps once (Scatter first: {scatterFirst})");
+            bell.GremlinMobLine = saved;
+            body.SetCurrentHpInternal(hp);
+        }
+    }
+
+    private static async Task CheckNobSwapLock(SceneTree tree, Player player, MobRosterRelic bell)
+    {
+        var body = player.Creature;
+        var combat = body.CombatState!;
+        var context = new ThrowingPlayerChoiceContext();
+        string lineup = bell.GremlinMobLine;
+        int initialBlock = body.Block;
+        int initialStrength = body.GetPowerAmount<MegaCrit.Sts2.Core.Models.Powers.StrengthPower>();
+        int initialCharge = body.GetPowerAmount<MobChargePower>();
+        int initialHits = combat.HittableEnemies.Sum(enemy => enemy.CurrentHp);
+        int initialWeak = combat.HittableEnemies.Sum(enemy => enemy.GetPowerAmount<MegaCrit.Sts2.Core.Models.Powers.WeakPower>());
+
+        foreach (var card in new CardModel[] { combat.CreateCard<MobPickFront>(player), combat.CreateCard<MobArms>(player) })
+        {
+            await CardPileCmd.Add(card, PileType.Hand);
+            Check(card.TryManualPlay(null), card.Id.Entry + " queues during Nob form");
+            await WaitFor(tree, () => NOverlayStack.Instance?.Peek() is NSimpleCardSelectScreen);
+            var screen = (NSimpleCardSelectScreen)NOverlayStack.Instance!.Peek()!;
+            var choice = Descendants(screen).OfType<NCard>().Select(node => node.Model).OfType<FighterOption>().First();
+            AccessTools.Method(typeof(NSimpleCardSelectScreen), "OnCardClicked").Invoke(screen, [choice]);
+            await WaitFor(tree, () => CombatManager.Instance.History.CardPlaysFinished.Any(entry => entry.CardPlay.Card == card));
+            Check(bell.GremlinMobLine == lineup && body.HasPower<MobRampageForm>(),
+                card.Id.Entry + " completes the native choice but Nob blocks the swap");
+        }
+        Check(body.Block == initialBlock && body.GetPowerAmount<MobChargePower>() == initialCharge &&
+            body.GetPowerAmount<MegaCrit.Sts2.Core.Models.Powers.StrengthPower>() == initialStrength &&
+            combat.HittableEnemies.Sum(enemy => enemy.CurrentHp) == initialHits &&
+            combat.HittableEnemies.Sum(enemy => enemy.GetPowerAmount<MegaCrit.Sts2.Core.Models.Powers.WeakPower>()) == initialWeak,
+            "Arms does not trigger the underlying gremlin's passive while transformed");
+
+        await PlayerCmd.GainEnergy(2, player);
+        await PowerCmd.Remove<MobChargePower>(body);
+        var counter = combat.CreateCard<MobCrewCounter>(player);
+        var attacking = combat.HittableEnemies.First(enemy => enemy.Monster?.IntendsToAttack == true);
+        var history = CombatManager.Instance.History;
+        int startingHistory = history.Entries.Count();
+        await CardPileCmd.Add(counter, PileType.Hand);
+        Check(counter.TryManualPlay(attacking), "Counter Strike queues against an attacking enemy while transformed");
+        await WaitFor(tree, () => history.CardPlaysFinished.Any(entry => entry.CardPlay.Card == counter));
+        Check(body.Block == initialBlock && !body.HasPower<MobChargePower>() &&
+            body.GetPowerAmount<MegaCrit.Sts2.Core.Models.Powers.StrengthPower>() == initialStrength &&
+            combat.HittableEnemies.Sum(enemy => enemy.GetPowerAmount<MegaCrit.Sts2.Core.Models.Powers.WeakPower>()) == initialWeak &&
+            history.Entries.Skip(startingHistory).OfType<DamageReceivedEntry>().Single(entry => entry.Dealer == body).CardSource == counter,
+            "Counter Strike suppresses the underlying gremlin's passive while transformed");
+
+        var cover = combat.CreateCard<MobCoverShift>(player);
+        await CardPileCmd.Add(cover, PileType.Hand);
+        Check(cover.TryManualPlay(null), "next-fighter swap card queues while transformed");
+        await WaitFor(tree, () => CombatManager.Instance.History.CardPlaysFinished.Any(entry => entry.CardPlay.Card == cover));
+        await UsePotion<MobRandomHandoffPotion>(player, context);
+        var rhythm = await PowerCmd.Apply<MobRotationRhythm>(context, body, 1, body, null);
+        await rhythm!.AfterPlayerTurnStart(context, player);
+        await PowerCmd.Remove(rhythm);
+        Check(bell.GremlinMobLine == lineup && body.HasPower<MobRampageForm>(),
+            "Nob blocks direct, random potion, and passive start-of-turn swaps");
+    }
+
     private static async Task CheckEventHealthPreviews(Player player, MobRosterRelic bell)
     {
         var body = player.Creature;
@@ -887,7 +1196,7 @@ public static class Probe
         Check(bell.GremlinMobLine != old && actor.Visuals.GetGlobalTransformWithCanvas().Origin.DistanceTo(origin) < 1,
             "Kaiser Crab rotation changed the leader without moving the native front anchor");
         CheckFormation(actor, bell);
-        CheckReserveHover(actor);
+        await CheckReserveHover(tree, actor);
         tree.Root.GetTexture().GetImage().SavePng(Path.Combine(Path.GetDirectoryName(OS.GetExecutablePath())!, "mob-kaiser-crab.png"));
 
         var body = player.Creature;
@@ -961,22 +1270,29 @@ public static class Probe
         await PowerCmd.Remove<MobRampageForm>(body);
     }
 
-    private static void CheckReserveHover(NCreature actor)
+    private static async Task CheckReserveHover(SceneTree tree, NCreature actor)
     {
         var hovering = (Dictionary<Control, NHoverTipSet>)AccessTools.Field(typeof(NHoverTipSet), "_activeHoverTips").GetValue(null)!;
         var reserves = Descendants(actor).OfType<Control>().Where(node => node.Name == "ReserveHover" && node.IsVisibleInTree()).ToArray();
         Check(reserves.Length == 4, "only the four reserves have active hover hitboxes");
+        var preceding = reserves.OrderBy(reserve => reserve.GetGlobalRect().Position.X).Select(reserve => reserve.GetGlobalRect()).ToArray();
+        Check(preceding.Zip(preceding.Skip(1)).All(pair => pair.First.End.X < pair.Second.Position.X),
+            "reserve hover targets leave gaps between neighboring figures");
+
+        void MoveMouse(Vector2 point) => tree.Root.PushInput(new InputEventMouseMotion
+            { Position = point, GlobalPosition = point }, true);
         foreach (var reserve in reserves)
         {
             var hit = reserve.GetGlobalRect();
             var figure = reserve.GetParent<Node2D>();
-            reserve.EmitSignal(Control.SignalName.MouseEntered);
+            MoveMouse(reserve.GetGlobalTransformWithCanvas() * (reserve.Size * .5f));
+            await WaitFor(tree, () => hovering.ContainsKey(reserve));
             var tip = hovering[reserve].GetNode<Control>("textHoverTipContainer").GetGlobalRect();
-            Check(Math.Abs(hit.GetCenter().X - figure.GlobalPosition.X) < 1 && hit.Position.Y < figure.GlobalPosition.Y &&
+            Check(hit.Position.X < figure.GlobalPosition.X && hit.End.X > figure.GlobalPosition.X && hit.Position.Y < figure.GlobalPosition.Y &&
                 tip.End.Y <= hit.Position.Y && tip.GetCenter().X < hit.GetCenter().X + 180,
-                "reserve tooltip is above the associated model in " + figure.Name);
-            reserve.EmitSignal(Control.SignalName.MouseExited);
-            Check(!hovering.ContainsKey(reserve), "reserve tooltip clears on exit");
+                $"mouse hit {figure.Name} at {reserve.Size.X:F0}×{reserve.Size.Y:F0}, with the tooltip above the model");
+            MoveMouse(new Vector2(tree.Root.GetVisibleRect().Size.X - 8, tree.Root.GetVisibleRect().Size.Y / 2));
+            await WaitFor(tree, () => !hovering.ContainsKey(reserve));
         }
     }
 

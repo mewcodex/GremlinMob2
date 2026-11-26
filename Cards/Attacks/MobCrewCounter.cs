@@ -10,7 +10,7 @@ public sealed class MobCrewCounter() : DescribedMobCard(
     {
         bool attacking = play.Target?.Monster?.IntendsToAttack == true;
         await Attack(ctx, play, DamageAmount);
-        if (!attacking || Crew is not { } crew) return;
+        if (!attacking || Body.HasPower<MobRampageForm>() || Crew is not { } crew) return;
         for (int i = 0; i < EffectAmount; i++) await crew.TriggerBonus(ctx, crew.Front, play);
     }
 }

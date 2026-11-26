@@ -66,6 +66,7 @@ public sealed class MobRotatingBell : MobRosterRelic
         if (Owner.Character is not GremlinMobCharacter ||
             Owner.Relics.OfType<MobRotationBell>().FirstOrDefault() is not { } starter) return;
         GremlinMobLine = starter.GremlinMobLine;
+        OverpoweredMode = starter.OverpoweredMode;
         await RelicCmd.Remove(starter);
     }
 

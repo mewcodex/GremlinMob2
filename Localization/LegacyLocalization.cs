@@ -115,7 +115,7 @@ internal static partial class LegacyLocalization
     {
         MobChargePower when parts.Length > 3 => parts[0] + "{ChargeRemaining}" + parts[2],
         MobPainSuppression when parts.Length > 2 => parts[0] + "80" + parts[1] + "{Amount}" + parts[2],
-        MobRotationRhythm => Join(parts, 1, "[E]"),
+        MobRotationRhythm => Join(parts, 1, "{Amount:energyIcons}"),
         MobAttackCounterArmor when parts.Length > 3 => parts[0] + "7" + parts[2] + "{Amount}" + parts[3],
         MobTemporaryGuard or MobBlockAsDamage or MobHoldStrength or MobRampageForm => parts.FirstOrDefault() ?? "",
         _ => Join(parts, 1, "{Amount}")

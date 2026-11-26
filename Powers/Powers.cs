@@ -1,4 +1,5 @@
 using MegaCrit.Sts2.Core.Localization;
+using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
@@ -8,6 +9,7 @@ using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Powers;
+using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.ValueProps;
 
 namespace GremlinMob2;
@@ -80,19 +82,28 @@ public sealed class MobTemporaryGuard : MobPower
 
     public override decimal ModifyHpLostAfterOstyLate(Creature target, decimal amount, ValueProp props, Creature? dealer, CardModel? cardSource)
     {
-        if (target != Owner || amount < 1 || Amount <= 0) return amount;
-        int spent = Math.Min((int)amount, Amount);
-        TemporaryHpDamage.Record(this, spent);
-        return Owner.HasPower<MobRampageForm>() ? 0 : amount - spent;
+        if (target != Owner || amount < 1) return amount;
+        if (Amount > 0)
+        {
+            int spent = Math.Min((int)amount, Amount);
+            TemporaryHpDamage.Record(this, spent);
+            amount = Owner.HasPower<MobRampageForm>() ? 0 : amount - spent;
+        }
+
+        // Scatter reacts to remaining real HP loss, regardless of the powers' application order.
+        return Owner.GetPower<MobEvadeAndRotate>()?.PreventHpLoss(amount) ?? amount;
     }
 
     public override Task AfterDamageReceived(PlayerChoiceContext context, Creature target, DamageResult result, ValueProp props, Creature? dealer, CardModel? source) =>
         target == Owner && Amount == 0 ? PowerCmd.Remove(this) : Task.CompletedTask;
+
+    public override Task AfterRemoved(Creature oldOwner) =>
+        oldOwner.HasPower<MobTemporaryGuard>() ? Task.CompletedTask : PowerCmd.Remove<MobRampageForm>(oldOwner);
 }
 
 public sealed class MobRotationRhythm : MobPower
 {
-    public override async Task AfterPlayerTurnStart(PlayerChoiceContext context, Player player)
+    public override async Task BeforeHandDraw(Player player, PlayerChoiceContext context, ICombatState combatState)
     {
         if (player.Creature != Owner) return;
         await PlayerCmd.GainEnergy(Amount, player);
@@ -126,17 +137,19 @@ public sealed class MobShadeKnivesPower : MobPower
 
 public sealed class MobWardMakerPower : MobPower
 {
-    public override async Task AfterPlayerTurnStart(PlayerChoiceContext context, Player player)
+    public override async Task BeforeHandDraw(Player player, PlayerChoiceContext context, ICombatState combatState)
     {
-        if (player.Creature != Owner || Owner.CombatState is not { } combat) return;
-        var cards = Enumerable.Range(0, Amount).Select(_ => combat.CreateCard<MobPaperWard>(player)).ToArray();
-        await CardPileCmd.AddGeneratedCardsToCombat(cards, PileType.Hand, player);
+        if (player.Creature != Owner) return;
+        await CardPileCmd.Draw(context, Amount, player);
+        var cards = Enumerable.Range(0, Amount).Select(_ => combatState.CreateCard<MobPaperWard>(player)).ToArray();
+        foreach (var card in cards) CardCmd.Upgrade(card, CardPreviewStyle.None);
+        await CardPileCmd.AddGeneratedCardsToCombat(cards, PileType.Discard, player);
     }
 }
 
 public sealed class MobWizardTrainingPower : MobPower
 {
-    public override Task AfterPlayerTurnStart(PlayerChoiceContext context, Player player) =>
+    public override Task BeforeHandDraw(Player player, PlayerChoiceContext context, ICombatState combatState) =>
         player.Creature == Owner ? PowerCmd.Apply<MobChargePower>(context, Owner, Amount, Owner, null) : Task.CompletedTask;
 }
 

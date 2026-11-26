@@ -16,7 +16,7 @@ internal static partial class LegacyLocalization
     private static readonly string[] HighlightedBaseTerms =
     [
         "artifact", "block", "dexterity", "ethereal", "exhaust", "frail", "innate", "intangible",
-        "poison", "retain", "shiv", "strength", "thorns", "unplayable", "upgrade", "vulnerable", "weak"
+        "poison", "retain", "scry", "shiv", "strength", "thorns", "unplayable", "upgrade", "vulnerable", "weak"
     ];
 
     private static readonly Regex CardMarkup = new(

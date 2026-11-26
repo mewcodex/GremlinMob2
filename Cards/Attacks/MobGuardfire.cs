@@ -13,5 +13,5 @@ public sealed class MobGuardfire() : DescribedMobCard(
         await Apply<MobBlockAsDamage>(context, 1);
     }
     public override Task AfterCardDrawn(PlayerChoiceContext context, CardModel card, bool fromHandDraw) =>
-        card == this ? Draw(context, 1) : Task.CompletedTask;
+        card == this ? Draw(context, 2) : Task.CompletedTask;
 }

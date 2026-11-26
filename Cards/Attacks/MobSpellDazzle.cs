@@ -1,6 +1,5 @@
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
-using MegaCrit.Sts2.Core.Models.Powers;
 
 namespace GremlinMob2;
 
@@ -12,7 +11,6 @@ public sealed class MobSpellDazzle() : DescribedMobCard(
         bool ready = ChargeCount >= 3;
         await Attack(context, play, DamageAmount);
         if (!ready || play.Target is not { IsAlive: true } target) return;
-        await Apply<StrengthPower>(context, -2, target);
-        await Apply<StrengthPower>(context, 2);
+        await StealStrength(context, target, 2);
     }
 }
