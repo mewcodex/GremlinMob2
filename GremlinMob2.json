@@ -3,7 +3,7 @@
   "name": "地精小队",
   "author": "Alriph",
   "description": "一群混乱的高塔地精暴徒集结在一起。\n寻找食物和财宝。",
-  "version": "0.2.16",
+  "version": "0.2.17",
   "min_game_version": "0.114.0",
   "has_dll": true,
   "has_pck": true,

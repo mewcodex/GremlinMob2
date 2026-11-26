@@ -289,6 +289,22 @@ public static class Probe
             var libraryCards = character.CardPool.AllCards.Where(card => card.ShouldShowInCardLibrary && card.Rarity != CardRarity.Ancient).ToHashSet();
             await WaitFor(tree, () => libraryCards.SetEquals(libraryGrid.VisibleCards));
             Check(poolFilter.Visible && libraryCards.Count > 0, $"native Compendium lists all {libraryCards.Count} library-visible squad cards under its own filter");
+            var defendArt = ModelDb.Card<MobDefend>();
+            var ancientArt = ModelDb.Card<MobAllHands>();
+            var inspect = NGame.Instance!.GetInspectCardScreen();
+            try
+            {
+                inspect.Open([defendArt, ancientArt], 0, viewAllUpgraded: true);
+                var cardView = Descendants(inspect).OfType<NCard>().Single();
+                var portrait = cardView.GetNode<TextureRect>("%Portrait");
+                Check(defendArt.Portrait.GetWidth() < portrait.Texture.GetWidth() &&
+                    portrait.Texture.ResourcePath.EndsWith("/cards/defend_p.res"),
+                    "native inspect screen shows archived large Defend art while normal cards use the small portrait");
+                AccessTools.Method(typeof(NInspectCardScreen), "OnRightButtonReleased").Invoke(inspect, []);
+                Check(cardView.GetNode<TextureRect>("%AncientPortrait").Texture.ResourcePath == ancientArt.PortraitPath,
+                    "native inspect screen falls back to the usual Ancient portrait when large art is missing");
+            }
+            finally { inspect.Close(); }
             var miscFilter = library.GetNode<NCardPoolFilter>("%MiscPool");
             miscFilter.IsSelected = true;
             miscFilter.EmitSignal(NCardPoolFilter.SignalName.Toggled, miscFilter);

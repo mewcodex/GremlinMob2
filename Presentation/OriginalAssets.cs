@@ -16,6 +16,7 @@ internal static class OriginalAssets
     private static readonly Dictionary<string, Resource> Rigs = [];
 
     internal static string? Icon(object model, bool beta = false) => Bindings.Value.GetValueOrDefault(model.GetType().Name + (beta ? ":beta" : ""));
+    internal static string? LargeCardPortrait(MobCard card) => Bindings.Value.GetValueOrDefault(card.GetType().Name + ":large");
     internal static string? RelicIcon(MobRelic relic, string variant) => Bindings.Value.GetValueOrDefault(relic.GetType().Name + ":" + variant);
 
     internal static string? Picture(string name)

@@ -386,6 +386,8 @@ def main():
                         raise ValueError(f"Missing original picture for {original}: {name}")
                     name = alternate
                 refs[model] = "res://gremlin_mob_2/original/" + name.removesuffix(".png") + ".res"
+                if category == "cards" and (large := f"{category}/{key}_p.png") in pictures:
+                    refs[model + ":large"] = "res://gremlin_mob_2/original/" + large.removesuffix(".png") + ".res"
                 beta = f"cards/betacards/{original}.png"
                 if category == "cards" and beta in pictures:
                     refs[model + ":beta"] = "res://gremlin_mob_2/original/" + beta.removesuffix(".png") + ".res"

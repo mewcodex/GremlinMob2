@@ -24,6 +24,8 @@ public abstract class MobCard(int cost, CardType type, CardRarity rarity, Target
     public override bool CanBeGeneratedByModifiers => Rarity is not (CardRarity.Token or CardRarity.Ancient);
     public override string PortraitPath => OriginalAssets.Icon(this) ?? base.PortraitPath;
     public override string BetaPortraitPath => OriginalAssets.Icon(this, beta: true) ?? PortraitPath;
+    // The native inspect screen loads this path and falls back to PortraitPath when it is absent.
+    protected override string PortraitPngPath => OriginalAssets.LargeCardPortrait(this) ?? base.PortraitPngPath;
     protected override IEnumerable<IHoverTip> ExtraHoverTips => LegacyLocalization.KeywordTips(this).Concat(OriginalCardPreview.GetTips(this));
     internal string DisplayName => LegacyLocalization.Title(this, "cards");
     protected override void AddExtraArgsToDescription(LocString description)
