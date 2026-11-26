@@ -1,0 +1,12 @@
+bin/
+obj/
+build/
+.godot/
+__pycache__/
+*.pyc
+*.dll
+*.pdb
+*.pck
+*.jar
+*.rar
+/checks/*-result.txt

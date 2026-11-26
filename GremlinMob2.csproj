@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GameDir Condition="'$(GameDir)' == ''">F:\SteamLibrary\steamapps\common\Slay the Spire 2</GameDir>
+    <GodotExe Condition="'$(GodotExe)' == ''">F:\godot\Godot_v4.5.1-stable_mono_win64_console.exe</GodotExe>
+    <GameData>$(GameDir)\data_sts2_windows_x86_64</GameData>
+    <Sts1AssetsDir Condition="'$(Sts1AssetsDir)' == ''">$(ProjectDir)..\desktop-1.0</Sts1AssetsDir>
+    <DownfallGremlinsDir Condition="'$(DownfallGremlinsDir)' == ''">$(ProjectDir)..\DownfallConpendium2\pipeline\temp\Gremlins</DownfallGremlinsDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="sts2"><HintPath>$(GameData)\sts2.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="GodotSharp"><HintPath>$(GameData)\GodotSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(GameData)\0Harmony.dll</HintPath><Private>false</Private></Reference>
+    <Compile Remove="checks\**;build\**" />
+  </ItemGroup>
+  <PropertyGroup>
+    <NativeRigsArg Condition="'$(NativeRigsDir)' != ''">--native-rigs &quot;$(NativeRigsDir)&quot;</NativeRigsArg>
+    <FeminizationArg Condition="'$(FeminizationArchive)' != ''">--feminization &quot;$(FeminizationArchive)&quot;</FeminizationArg>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(NativeRigsDir)' != ''"><NativeRig Include="$(NativeRigsDir)\**\*.spskel;$(NativeRigsDir)\**\*.png" /></ItemGroup>
+  <ItemGroup><Sts1AssetsInput Include="$(Sts1AssetsDir)\powers\powers.*;$(Sts1AssetsDir)\images\potion\**\*.png;$(Sts1AssetsDir)\localization\**\keywords.json;$(Sts1AssetsDir)\images\ui\charSelect\tiny*Arrow.png" /></ItemGroup>
+  <ItemGroup><DownfallCharacterInput Include="$(DownfallGremlinsDir)\images\character\*.png;$(DownfallGremlinsDir)\material\character\transition_mat.tres;$(DownfallGremlinsDir)\scenes\character\card_trail.tscn" /></ItemGroup>
+  <ItemGroup><FeminizationCardArt Include="$(ProjectDir)assets\feminization_card_art\*.png" /></ItemGroup>
+  <Target Name="ImportLegacy" Condition="'$(CatfallJar)' != ''" Inputs="$(CatfallJar);$(FeminizationArchive);$(ProjectDir)tools\import_catfall.py;$(ProjectDir)tools\catalog.ini;$(ProjectDir)assets\ancient_placeholder.png;@(NativeRig);@(Sts1AssetsInput)" Outputs="$(ProjectDir)build\legacy\manifest.txt">
+    <Exec Command="python &quot;$(ProjectDir)tools\import_catfall.py&quot; &quot;$(CatfallJar)&quot; &quot;$(ProjectDir)build\legacy&quot; --base-sts1 &quot;$(Sts1AssetsDir)&quot; $(NativeRigsArg) $(FeminizationArg)" />
+  </Target>
+  <Target Name="PackAssets" DependsOnTargets="ImportLegacy" Inputs="$(ProjectDir)tools\pack.gd;$(MSBuildProjectFullPath);$(ProjectDir)assets\selection_original.tscn;$(ProjectDir)assets\character_icon.tscn;$(ProjectDir)build\legacy\manifest.txt;@(DownfallCharacterInput);@(FeminizationCardArt)" Outputs="$(ProjectDir)build\GremlinMob2\GremlinMob2.pck">
+    <MakeDir Directories="$(ProjectDir)build\GremlinMob2" />
+    <Copy SourceFiles="$(ProjectDir)tools\project.godot" DestinationFolder="$(ProjectDir)build\select" />
+    <Copy SourceFiles="@(DownfallCharacterInput)" DestinationFolder="$(ProjectDir)build\select" />
+    <Exec Command="&quot;$(GodotExe)&quot; --headless --path &quot;$(ProjectDir)build\select&quot; --editor --import" />
+    <Exec Command="&quot;$(GodotExe)&quot; --headless --path &quot;$(ProjectDir)tools&quot; --script res://pack.gd -- &quot;$(MSBuildProjectDirectory)&quot; &quot;$(MSBuildProjectDirectory)\build\GremlinMob2\GremlinMob2.pck&quot;" />
+  </Target>
+  <Target Name="Package" AfterTargets="Build" DependsOnTargets="PackAssets">
+    <Copy SourceFiles="$(TargetPath);$(ProjectDir)GremlinMob2.json" DestinationFolder="$(ProjectDir)build\GremlinMob2" />
+  </Target>
+</Project>
